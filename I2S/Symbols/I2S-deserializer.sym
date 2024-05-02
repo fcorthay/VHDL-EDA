@@ -1,0 +1,90 @@
+v 20200319 2
+B 0 0 4000 3500 3 0 0 0 -1 -1 0 -1 -1 -1 -1 -1
+T 0 -200 9 10 1 0 0 1 1
+I2C deserializer
+P -500 500 0 500 1 0 0
+{
+T 100 500 5 10 1 1 0 1 1
+pinlabel=reset
+T 2600 1900 5 10 0 1 0 0 1
+pinnumber=2
+T 2600 1900 5 10 0 0 0 0 1
+pinseq=2
+T 400 250 5 10 0 1 0 0 1
+porttype=std_ulogic
+T 100 250 5 10 0 1 0 0 1
+portdirection=in
+}
+P -500 1000 0 1000 1 0 0
+{
+T 100 1000 5 10 1 1 0 1 1
+pinlabel=clock
+T 400 750 5 10 0 1 0 0 1
+porttype=std_ulogic
+T 100 750 5 10 0 1 0 0 1
+portdirection=in
+}
+P -500 2500 0 2500 1 0 0
+{
+T 100 2500 5 10 1 1 0 1 1
+pinlabel=SCK
+T -200 2250 5 10 0 1 0 0 1
+porttype=std_ulogic
+T -500 2250 5 10 0 1 0 0 1
+portdirection=in
+}
+P -500 2000 0 2000 1 0 0
+{
+T 100 2000 5 10 1 1 0 1 1
+pinlabel=WS
+T 400 1950 5 10 0 1 0 0 1
+porttype=std_ulogic
+T 100 1950 5 10 0 1 0 0 1
+portdirection=in
+}
+P -500 3000 0 3000 1 0 0
+{
+T 100 3000 5 10 1 1 0 1 1
+pinlabel=SD
+T 400 2750 5 10 0 1 0 0 1
+porttype=std_ulogic
+T 100 2750 5 10 0 1 0 0 1
+portdirection=in
+}
+P 4500 3000 4000 3000 1 0 0
+{
+T 3900 3000 5 10 1 1 0 7 1
+pinlabel=signalLeft
+T 3500 2750 5 10 0 1 0 6 1
+porttype=unsigned
+T 3900 2750 5 10 0 1 0 6 1
+portdirection=out
+T 3900 2550 5 10 0 1 0 6 1
+portrange=(bitNb-1 downto 0)
+}
+P 4500 2500 4000 2500 1 0 0
+{
+T 3900 2500 5 10 1 1 0 7 1
+pinlabel=signalRight
+T 3500 2250 5 10 0 1 0 6 1
+porttype=unsigned
+T 3900 2250 5 10 0 1 0 6 1
+portdirection=out
+T 3900 2050 5 10 0 1 0 6 1
+portrange=(bitNb-1 downto 0)
+}
+P 4500 2000 4000 2000 1 0 0
+{
+T 3900 2000 5 10 1 1 0 7 1
+pinlabel=sampleValid
+T 3500 1750 5 10 0 1 0 6 1
+porttype=std_ulogic
+T 3900 1750 5 10 0 1 0 6 1
+portdirection=out
+}
+T 0 -500 8 10 1 1 0 0 1
+refdes=I?
+T 600 1400 8 10 0 1 0 0 1
+device=none
+T -8 -700 8 10 1 1 0 0 1
+generic1=bitNb : positive := 24

@@ -1,0 +1,12 @@
+;(reset-component-library) ; don't use system symbols
+;(reset-source-library) ; don't use system schematics
+
+(define top-directory "/home/francois/Documents/GitHub/VHDL-EDA")
+
+(component-library-search (build-path top-directory "I2S_test" "Symbols") "I2S_test")
+(component-library-search (build-path top-directory "I2S" "Symbols") "I2S")
+;(component-library ".")
+
+;(define I2S-schematics (build-path top-directory "I2S" "Schematics"))
+(source-library  (build-path top-directory "I2S" "Schematics"))
+(source-library  (build-path top-directory "I2S_test" "Schematics"))
