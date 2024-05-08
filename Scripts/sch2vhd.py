@@ -71,6 +71,138 @@ if not os.path.isdir(scratch_directory) :
     print("scratch directory %s not found" % scratch_directory)
     quit()
 
+
+# ==============================================================================
+# functions
+#
+# ------------------------------------------------------------------------------
+# aggregate unnamed nets to named nets
+#
+def aggregate_one_unnamed_net(nets_labelled, nets_not_labelled):
+    super_verbose = False
+    found_item = []
+    for net_labelled in nets_labelled :
+        net_label = net_labelled[0]
+        if super_verbose :
+            print(INDENT + net_label)
+        for segment in range(1, len(net_labelled)-1) :
+            segment_start_x = net_labelled[segment][0]
+            segment_start_y = net_labelled[segment][1]
+            segment_end_x = net_labelled[segment+1][0]
+            segment_end_y = net_labelled[segment+1][1]
+                                                             # vertical segments
+            if segment_start_x == segment_end_x :
+                segment_x = segment_start_x
+                if super_verbose :
+                    print(2*INDENT + "vertical segment %d - [%d, %s]" % (
+                        segment_x, segment_start_y, segment_end_y
+                    ))
+                y_min = min(segment_start_y, segment_end_y)
+                y_max = max(segment_start_y, segment_end_y)
+                for net in range(len(nets_not_labelled)) :
+                    if not found_item :
+                        net_start_x = nets_not_labelled[net][0][0]
+                        net_end_x = nets_not_labelled[net][1][0]
+                        if net_start_x != net_end_x :
+                            net_y = nets_not_labelled[net][0][1]
+                                                         # test start of segment
+                            if net_start_x == segment_x :
+                                if (net_y >= y_min) and (net_y <= y_max) :
+                                    if verbose :
+                                        if super_verbose :
+                                            print(INDENT, end='')
+                                        else :
+                                            print(INDENT + "net %s" % net_label)
+                                        print(
+                                            2*INDENT +
+                                            "aggreagting net %d : [%d, %d]" % (
+                                                net, segment_x, net_y
+                                            )
+                                        )
+                                    nets_not_labelled.pop(net)
+                                    found_item = [
+                                        net_label,
+                                        [net_start_x, net_y],
+                                        [net_end_x, net_y]
+                                    ]
+                                                           # test end of segment
+                            if net_end_x == segment_x :
+                                if (net_y >= y_min) and (net_y <= y_max) :
+                                    if verbose :
+                                        if super_verbose :
+                                            print(INDENT, end='')
+                                        else :
+                                            print(INDENT + "net %s" % net_label)
+                                        print(
+                                            2*INDENT +
+                                            "aggreagting net %d : [%d, %d]" % (
+                                                net, segment_x, net_y
+                                            )
+                                        )
+                                    nets_not_labelled.pop(net)
+                                    found_item = [
+                                        net_label,
+                                        [net_start_x, net_y],
+                                        [net_end_x, net_y]
+                                    ]
+                                                           # horizontal segments
+            if segment_start_y == segment_end_y :
+                if super_verbose :
+                    print(2*INDENT + "horizontal segment %d - [%d, %s]" % (
+                        segment_start_y, segment_start_x, segment_end_x
+                    ))
+                x_min = min(segment_start_x, segment_end_x)
+                x_max = max(segment_start_x, segment_end_x)
+                for net in range(len(nets_not_labelled)) :
+                    if not found_item :
+                        net_start_y = nets_not_labelled[net][0][1]
+                        net_end_y = nets_not_labelled[net][1][1]
+                        if net_start_y != net_end_y :
+                            net_x = nets_not_labelled[net][0][0]
+                                                         # test start of segment
+                            if net_start_y == segment_start_y :
+                                if (net_x >= x_min) and (net_x <= x_max) :
+                                    if verbose :
+                                        if super_verbose :
+                                            print(INDENT, end='')
+                                        else :
+                                            print(INDENT + "net %s" % net_label)
+                                        print(
+                                            2*INDENT +
+                                            "aggreagting net %d : [%d, %d]" % (
+                                                net, net_x, net_start_y
+                                            )
+                                        )
+                                    nets_not_labelled.pop(net)
+                                    found_item = [
+                                        net_label,
+                                        [net_x, net_start_y],
+                                        [net_x, net_end_y]
+                                    ]
+                                                           # test end of segment
+                            if net_end_y == segment_start_y :
+                                if (net_x >= x_min) and (net_x <= x_max) :
+                                    if verbose :
+                                        if super_verbose :
+                                            print(INDENT, end='')
+                                        else :
+                                            print(INDENT + "net %s" % net_label)
+                                        print(
+                                            2*INDENT +
+                                            "aggreagting net %d : [%d, %d]" % (
+                                                net, net_x, net_start_y
+                                            )
+                                        )
+                                    nets_not_labelled.pop(net)
+                                    found_item = [
+                                        net_label,
+                                        [net_x, net_start_y],
+                                        [net_x, net_end_y]
+                                    ]
+    if found_item :
+        nets_labelled.append(found_item)
+    return(found_item)
+
 # ==============================================================================
 # main script
 #
@@ -79,19 +211,46 @@ print("Converting %s to %s" % (schematics_file_spec, vhdl_file_spec))
 if verbose :
     print("\nParsing schematics file")
 done = False
+discard_next_read = False
 processing_component_start = False
 processing_component = False
+processing_net_start = False
+processing_net = False
 processing_text = False
 components = []
+nets_not_labelled = []
+nets_labelled = []
 component_location = [0, 0]
+net_start = [0, 0]
+net_end = [0, 0]
+text_block = ''
+text_blocks = []
+
 schematics_file = open(schematics_file_spec, 'r')
 while not done :
-    line = schematics_file.readline().rstrip("\r\n")
+                                                                # read next line
+    if not discard_next_read :
+        line = schematics_file.readline().rstrip("\r\n")
+    else :
+        discard_next_read = False
+                                                                     # component
     if processing_component_start :
         if line.startswith('{') :
             processing_component = True
         processing_component_start = False
-
+                                                                           # net
+    elif processing_net_start :
+        if line.startswith('{') :
+            processing_net = True
+        else :
+            nets_not_labelled.append([net_start.copy(), net_end.copy()])
+            if verbose :
+                print(INDENT + "net")
+                print(2*INDENT + "[%d, %d] - [%d, %d]" %
+                    (net_start[0], net_start[1], net_end[0], net_end[1])
+                )
+        processing_net_start = False
+                                                                     # component
     if processing_component :
         value = '='.join((line + '= ').split('=')[1:-1])
                                                                # component label
@@ -118,14 +277,32 @@ while not done :
                 'generics' : component_generics
             })
             processing_component = False
-    elif processing_text :
-                                                                      # generics
-        if line.startswith('generic') :
-            (label, generic) = line.split('=', 1)
-            generics.append(generic)
+                                                                           # net
+    elif processing_net :
+        value = line[line.find('=')+1:]
+                                                                      # net name
+        if line.startswith('netname') :
+            net_name = value
             if verbose :
-                print(INDENT + 'generic : ' + generic)
-        processing_text = False
+                print(INDENT + "net %s" % net_name)
+                print(2*INDENT + "[%d, %d] - [%d, %d]" %
+                    (net_start[0], net_start[1], net_end[0], net_end[1])
+                )
+                                                             # net wrap together
+        if line.startswith('}') :
+            nets_labelled.append([net_name, net_start.copy(), net_end.copy()])
+            processing_net = False
+                                                                          # text
+    elif processing_text :
+        if re.search('\A[A-Z]\s', line) :
+            text_block = text_block[:-1]
+            text_blocks.append(text_block)
+            if verbose :
+                print(INDENT + "text")
+                print(text_block)
+            discard_next_read = True
+            processing_text = False
+        text_block = text_block + line + "\n"
     else :
                                                             # schematics element
         if line.startswith('C ') :
@@ -140,11 +317,37 @@ while not done :
                     component_location[0], component_location[0], component_name
                 ))
             processing_component_start = True
-        if line.startswith('T ') :
+        elif line.startswith('N ') or line.startswith('U ') :
+            net_info = line.split(' ')
+            net_start[0] = int(net_info[1])
+            net_start[1] = int(net_info[2])
+            net_end[0] = int(net_info[3])
+            net_end[1] = int(net_info[4])
+            processing_net_start = True
+        elif line.startswith('T ') :
+            text_block = ''
             processing_text = True
     if not line :
         done = True
 schematics_file.close()
+                                                                # aggregate nets
+if verbose :
+    print("\nAggregating nets")
+unlabelled_id = 0
+done_unlabelled = False
+while not done_unlabelled :
+    continue_search = True
+    while continue_search :
+        continue_search = aggregate_one_unnamed_net(nets_labelled, nets_not_labelled)
+    if not nets_not_labelled :
+        done_unlabelled = True
+    else :
+        nets_labelled.append([
+            "net%d" % unlabelled_id,
+            nets_not_labelled[0][0],
+            nets_not_labelled[0][1]
+        ])
+        unlabelled_id = unlabelled_id + 1
                                                             # write architecture
 # if verbose :
 #     print("\nWriting entity")
