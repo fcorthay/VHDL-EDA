@@ -24,31 +24,31 @@ porttype=std_ulogic
 T 100 750 5 10 0 1 0 0 1
 portdirection=in
 }
+P -500 3000 0 3000 1 0 0
+{
+T 100 3000 5 10 1 1 0 1 1
+pinlabel=SCK
+T -200 2750 5 10 0 1 0 0 1
+porttype=std_ulogic
+T -500 2750 5 10 0 1 0 0 1
+portdirection=in
+}
 P -500 2500 0 2500 1 0 0
 {
 T 100 2500 5 10 1 1 0 1 1
-pinlabel=SCK
-T -200 2250 5 10 0 1 0 0 1
+pinlabel=WS
+T 400 2450 5 10 0 1 0 0 1
 porttype=std_ulogic
-T -500 2250 5 10 0 1 0 0 1
+T 100 2450 5 10 0 1 0 0 1
 portdirection=in
 }
 P -500 2000 0 2000 1 0 0
 {
 T 100 2000 5 10 1 1 0 1 1
-pinlabel=WS
-T 400 1950 5 10 0 1 0 0 1
-porttype=std_ulogic
-T 100 1950 5 10 0 1 0 0 1
-portdirection=in
-}
-P -500 3000 0 3000 1 0 0
-{
-T 100 3000 5 10 1 1 0 1 1
 pinlabel=SD
-T 400 2750 5 10 0 1 0 0 1
+T 400 1750 5 10 0 1 0 0 1
 porttype=std_ulogic
-T 100 2750 5 10 0 1 0 0 1
+T 100 1750 5 10 0 1 0 0 1
 portdirection=in
 }
 P 4500 3000 4000 3000 1 0 0

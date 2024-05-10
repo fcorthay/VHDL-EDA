@@ -115,7 +115,7 @@ def aggregate_one_unnamed_net(nets_labelled, nets_not_labelled):
                                             print(INDENT + "net %s" % net_label)
                                         print(
                                             2*INDENT +
-                                            "aggreagting net %d : [%d, %d]" % (
+                                            "aggreagting net %d at [%d, %d]" % (
                                                 net, segment_x, net_y
                                             )
                                         )
@@ -135,7 +135,7 @@ def aggregate_one_unnamed_net(nets_labelled, nets_not_labelled):
                                             print(INDENT + "net %s" % net_label)
                                         print(
                                             2*INDENT +
-                                            "aggreagting net %d : [%d, %d]" % (
+                                            "aggreagting net %d at [%d, %d]" % (
                                                 net, segment_x, net_y
                                             )
                                         )
@@ -169,7 +169,7 @@ def aggregate_one_unnamed_net(nets_labelled, nets_not_labelled):
                                             print(INDENT + "net %s" % net_label)
                                         print(
                                             2*INDENT +
-                                            "aggreagting net %d : [%d, %d]" % (
+                                            "aggreagting net %d at [%d, %d]" % (
                                                 net, net_x, net_start_y
                                             )
                                         )
@@ -189,7 +189,7 @@ def aggregate_one_unnamed_net(nets_labelled, nets_not_labelled):
                                             print(INDENT + "net %s" % net_label)
                                         print(
                                             2*INDENT +
-                                            "aggreagting net %d : [%d, %d]" % (
+                                            "aggreagting net %d at [%d, %d]" % (
                                                 net, net_x, net_start_y
                                             )
                                         )
@@ -207,6 +207,8 @@ def aggregate_one_unnamed_net(nets_labelled, nets_not_labelled):
 # main script
 #
 print("Converting %s to %s" % (schematics_file_spec, vhdl_file_spec))
+
+# ------------------------------------------------------------------------------
                                                                     # parse file
 if verbose :
     print("\nParsing schematics file")
@@ -233,12 +235,12 @@ while not done :
         line = schematics_file.readline().rstrip("\r\n")
     else :
         discard_next_read = False
-                                                                     # component
+                                                         # pre-process component
     if processing_component_start :
         if line.startswith('{') :
             processing_component = True
         processing_component_start = False
-                                                                           # net
+                                                               # pre-process net
     elif processing_net_start :
         if line.startswith('{') :
             processing_net = True
@@ -274,7 +276,8 @@ while not done :
                 'name' : component_name,
                 'label' : component_label,
                 'source' : component_source,
-                'generics' : component_generics
+                'generics' : component_generics,
+                'location' : component_location.copy()
             })
             processing_component = False
                                                                            # net
@@ -294,7 +297,7 @@ while not done :
             processing_net = False
                                                                           # text
     elif processing_text :
-        if re.search('\A[A-Z]\s', line) :
+        if re.search('\A[A-Z]\s', line) or not line :
             text_block = text_block[:-1]
             text_blocks.append(text_block)
             if verbose :
@@ -309,7 +312,7 @@ while not done :
             component_info = line.split(' ')
             component_location[0] = int(component_info[1])
             component_location[1] = int(component_info[2])
-            component_name = component_info[-1]
+            component_name = component_info[-1].rstrip('.sym')
             component_label = ''
             component_generics = []
             if verbose :
@@ -330,27 +333,80 @@ while not done :
     if not line :
         done = True
 schematics_file.close()
+
+# ------------------------------------------------------------------------------
                                                                 # aggregate nets
 if verbose :
     print("\nAggregating nets")
 unlabelled_id = 0
 done_unlabelled = False
 while not done_unlabelled :
+                                                       # aggregate labelled nets
     continue_search = True
     while continue_search :
-        continue_search = aggregate_one_unnamed_net(nets_labelled, nets_not_labelled)
-    if not nets_not_labelled :
-        done_unlabelled = True
-    else :
+        continue_search = aggregate_one_unnamed_net(
+            nets_labelled, nets_not_labelled
+        )
+                                                    # label first unlabelled net
+    if nets_not_labelled :
         nets_labelled.append([
             "net%d" % unlabelled_id,
             nets_not_labelled[0][0],
             nets_not_labelled[0][1]
         ])
+        nets_not_labelled.pop(0)
         unlabelled_id = unlabelled_id + 1
+    else :
+        done_unlabelled = True
+
+# ------------------------------------------------------------------------------
+                                                            # connect components
+if verbose :
+    print("\nConnecting components")
+port_locations = []
+for component in components :
+    component_name = component['name']
+    component_location = component['location']
+    if verbose :
+        print(INDENT + component_name)
+    port_locations_file_spec = os.sep.join([
+        scratch_directory,component_name + "-port_locations.txt"
+    ])
+    if not os.path.isfile(port_locations_file_spec) :
+        print("port location file %s not found" % port_locations_file_spec)
+        quit()
+    port_locations_file = open(port_locations_file_spec, 'r')
+    locations = port_locations_file.read().replace("\r", "\n").split("\n")
+    port_locations_file.close()
+    for location in locations :
+        location_trimmed = location.replace('[', '').replace(']', '')
+        location_trimmed = location_trimmed.replace(',', '')
+        location_list = location_trimmed.split(' ')
+        if len(location_list) == 3 :
+            port_name = location_list[0]
+            port_coordinates = [
+                component_location[0] + int(location_list[1]),
+                component_location[1] + int(location_list[2])
+            ]
+            for net in nets_labelled :
+                net_name = net[0]
+                net_start = net[1]
+                net_end = net[2]
+                if \
+                    (net_start == port_coordinates) or \
+                    (net_end == port_coordinates)      \
+                :
+                    if verbose :
+                        print(2*INDENT + "%s - %s" % (port_name, net_name))
+                    port_locations.append([component_name, port_name, net_name])
+#print(port_locations)
+
+#    print(2*INDENT, end='') ; print(component)
+
+# ------------------------------------------------------------------------------
                                                             # write architecture
 # if verbose :
-#     print("\nWriting entity")
+#     print("\nWriting architecture")
 # vhdl_file = open(vhdl_file_spec, 'w')
 #                                                                   # entity start
 # vhdl_file.write("entity %s is\n" % symbol_name)

@@ -53,7 +53,7 @@ else :
 symbol_name = os.path.basename(symbol_file_spec).rstrip('.sym')
 vhdl_file_spec = os.path.join(vhdl_file_path, symbol_name + '.vhd')
 port_locations_file_spec = os.path.join(
-    scratch_directory, symbol_name + '-port_locations.vhd'
+    scratch_directory, symbol_name + '-port_locations.txt'
 )
                                                                # validity checks
 if not os.path.isfile(symbol_file_spec) :
@@ -112,7 +112,7 @@ while not done :
                 'type' : port_type,
                 'range' : port_range,
                 'direction' : port_direction,
-                'location' : port_location
+                'location' : port_location.copy()
             })
             processing_port = False
     elif processing_text :
@@ -194,6 +194,8 @@ if ports :
         print("\nWriting port locations to %s" % port_locations_file_spec)
     port_locations_file = open(port_locations_file_spec, 'w')
     for port in ports :
+        if verbose :
+            print(INDENT + port['name'])
         port_locations_file.write("%s [%s, %s]\n" % (
             port['name'],
             port['location'][0],
