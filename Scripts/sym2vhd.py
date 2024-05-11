@@ -20,6 +20,11 @@ parser = argparse.ArgumentParser(
 )
                                                                     # input file
 parser.add_argument('input_file')
+                                                                  # VHDL library
+parser.add_argument(
+    '-l', '--library',
+    help = 'VHDL library'
+)
                                                                 # VHDL directory
 parser.add_argument(
     '-d', '--directory',
@@ -39,10 +44,14 @@ parser.add_argument(
 parser_arguments = parser.parse_args()
 
 symbol_file_spec = parser_arguments.input_file
+VHDL_library = parser_arguments.library
 VHDL_directory = parser_arguments.directory
 scratch_directory = parser_arguments.scratch
 verbose = parser_arguments.verbose
 
+symbol_name = os.path.basename(symbol_file_spec).rstrip('.sym')
+if not VHDL_library :
+    VHDL_library = symbol_name.split('-', 1)[0]
 symbol_file_path = os.path.dirname(symbol_file_spec)
 if VHDL_directory :
     vhdl_file_path = VHDL_directory
@@ -50,7 +59,6 @@ else :
     path_list = symbol_file_path.split(os.sep)
     path_list[-1] = 'Description'
     vhdl_file_path = os.sep.join(path_list)
-symbol_name = os.path.basename(symbol_file_spec).rstrip('.sym')
 vhdl_file_spec = os.path.join(vhdl_file_path, symbol_name + '.vhd')
 port_locations_file_spec = os.path.join(
     scratch_directory, symbol_name + '-port_locations.txt'
@@ -72,6 +80,8 @@ if not os.path.isdir(scratch_directory) :
 # main script
 #
 print("Converting %s to %s" % (symbol_file_spec, vhdl_file_spec))
+
+# ------------------------------------------------------------------------------
                                                                     # parse file
 if verbose :
     print("\nParsing symbol file")
@@ -144,10 +154,32 @@ while not done :
     if not line :
         done = True
 symbol_file.close()
+
+# ------------------------------------------------------------------------------
                                                                   # write entity
 if verbose :
     print("\nWriting entity")
 vhdl_file = open(vhdl_file_spec, 'w')
+                                                                     # libraries
+vhdl_file.write("library %s;\n" % VHDL_library)
+use_1164 = False
+use_numeric_std = False
+for port in ports :
+    if port['type'].lower().startswith('std_logic') :
+        use_1164 = True
+    if port['type'].lower().startswith('std_ulogic') :
+        use_1164 = True
+    if port['type'].lower() == 'unsigned' :
+        use_numeric_std = True
+    if port['type'].lower() == 'signed' :
+        use_numeric_std = True
+if use_1164 or use_numeric_std :
+    vhdl_file.write("library ieee;\n")
+if use_1164 :
+    vhdl_file.write(INDENT + "use ieee.std_logic_1164.all;\n")
+if use_numeric_std :
+    vhdl_file.write(INDENT + "use ieee.numeric_std.all;\n")
+vhdl_file.write("\n")
                                                                   # entity start
 vhdl_file.write("entity %s is\n" % symbol_name)
                                                                       # generics

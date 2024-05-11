@@ -438,8 +438,17 @@ if verbose :
 vhdl_file = open(vhdl_file_spec, 'w')
                                                             # architecture start
 vhdl_file.write(
-    "architecture %s of %s is\n" % (architecture_name, symbol_name)
+    "architecture %s of %s-%s is\n" %
+    (architecture_name, library_name, symbol_name)
 )
+                                                        # pre-begin declarations
+
+
+
+
+
+
+
                                                                        # signals
 if signals :
     separator = ';'
@@ -463,24 +472,19 @@ if signals :
                                                                     # components
 if components :
     if verbose :
-        print(INDENT + "components :")
+        print(INDENT + "component declarations :")
     vhdl_file.write("\n")
     for component in components :
         if verbose :
             print(2*INDENT + component_name)
-                                                                         # label
-        # component_label = component['label']
-        # vhdl_file.write(INDENT)
-        # if component_label :
-        #     vhdl_file.write(component_label + ' : ')
                                                                      # component
         component_name = component['name']
         vhdl_file.write(INDENT + "component %s\n" % component_name)
-        component_generics = component['generics']
                                                                       # generics
+        component_generics = component['generics']
         if component_generics :
             separator = ';'
-            vhdl_file.write(2*INDENT + "generics(\n")
+            vhdl_file.write(2*INDENT + "generic(\n")
             for index in range(len(component_generics)) :
                 if index == len(component_generics)-1 :
                     separator = ''
@@ -498,7 +502,6 @@ if components :
         while (len(ports) > 0) and (not ports[-1]) :
             ports.pop()
         if ports :
-            print(ports)
             separator = ';'
             vhdl_file.write(2*INDENT + "port(\n")
             for index in range(len(ports)) :
@@ -514,6 +517,60 @@ if components :
                                                             # architecture begin
 vhdl_file.write("begin\n")
                                                              # component mapping
+if components :
+    if verbose :
+        print(INDENT + "component mappings :")
+    vhdl_file.write("\n")
+    for component in components :
+        component_name = component['name']
+        if verbose :
+            print(2*INDENT + component_name)
+                                                                         # label
+        component_label = component['label']
+        vhdl_file.write(INDENT)
+        if component_label :
+            vhdl_file.write(component_label + ' : ')
+                                                                     # component
+        vhdl_file.write("%s\n" % component['name'])
+                                                               # generic mapping
+        component_generics = component['generics']
+        if component_generics :
+            separator = ','
+            vhdl_file.write(2*INDENT + "generic map(\n")
+            for index in range(len(component_generics)) :
+                generics_info = component_generics[index].split(':')
+                generic_name = generics_info[0].rstrip(' ')
+                generic_mapping = generics_info[-1].lstrip('= ')
+                if index == len(component_generics)-1 :
+                    separator = ''
+                vhdl_file.write(
+                    3*INDENT + "%s => %s%s\n" %
+                    (generic_name, generic_mapping, separator)
+                )
+            vhdl_file.write(2*INDENT + ")\n")
+                                                                  # port mapping
+        if ports :
+            separator = ','
+            vhdl_file.write(2*INDENT + "port map(\n")
+            for index in range(len(ports)) :
+                port_name = ports[index].split(' ', 1)[0]
+                connected_signal = ''
+                for port_connection in port_connections :
+                    if \
+                        (port_connection[0] == component_name) and \
+                        (port_connection[1] == port_name)          \
+                    :
+                        connected_signal = port_connection[2]
+                    if not connected_signal :
+                        connected_signal = 'open'
+                if index == len(ports)-1 :
+                    separator = ''
+                vhdl_file.write(
+                    3*INDENT + "%s => %s%s\n" %
+                    (port_name, connected_signal, separator)
+                )
+            vhdl_file.write(2*INDENT + ");\n")
+        vhdl_file.write("\n")
                                                               # architecture end
 vhdl_file.write("end %s;\n" % architecture_name)
 vhdl_file.close()
