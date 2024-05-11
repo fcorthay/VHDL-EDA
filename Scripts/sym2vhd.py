@@ -196,8 +196,9 @@ if ports :
     for port in ports :
         if verbose :
             print(INDENT + port['name'])
-        port_locations_file.write("%s [%s, %s]\n" % (
+        port_locations_file.write("%s %s [%s, %s]\n" % (
             port['name'],
+            port['type'] + port['range'],
             port['location'][0],
             port['location'][1]
         ))

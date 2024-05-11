@@ -25,6 +25,8 @@ N 9500 8000 9500 10000 4
 {
 T 9450 8000 5 10 1 1 90 0 1
 netname=reset
+T 9450 8600 5 10 1 1 90 0 1
+signaltype=std_ulogic
 }
 N 9500 10000 10000 10000 4
 N 9000 8000 9000 10500 4
@@ -56,6 +58,10 @@ U 16500 12500 16500 8000 10 0
 {
 T 16550 8000 5 10 1 1 90 2 1
 netname=signalLeft
+T 16550 9000 5 10 1 1 90 2 1
+signaltype=unsigned
+T 16550 9900 5 10 1 1 90 2 1
+signalrange=signalBitNb-1 downto 0
 }
 N 15000 11500 15500 11500 4
 N 15500 11500 15500 8000 4
@@ -68,6 +74,8 @@ U 16000 12000 16000 8000 10 0
 {
 T 16050 8000 5 10 1 1 90 2 1
 netname=signalRight
+T 16050 9200 5 10 1 1 90 2 1
+signalrange=signalBitNb-1 downto 0
 }
 T 500 16000 9 10 1 0 0 0 2
 pre-begin:

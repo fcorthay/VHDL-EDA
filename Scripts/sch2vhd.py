@@ -222,6 +222,7 @@ processing_text = False
 components = []
 nets_not_labelled = []
 nets_labelled = []
+signals = []
 component_location = [0, 0]
 net_start = [0, 0]
 net_end = [0, 0]
@@ -291,9 +292,20 @@ while not done :
                 print(2*INDENT + "[%d, %d] - [%d, %d]" %
                     (net_start[0], net_start[1], net_end[0], net_end[1])
                 )
+                                                                      # net type
+        if line.startswith('signaltype') :
+            net_type = value
+            if verbose :
+                print(2*INDENT + net_type)
+                                                                     # net range
+        if line.startswith('signalrange') :
+            net_range = value
+            if verbose :
+                print(2*INDENT + "(%s)" % net_range)
                                                              # net wrap together
         if line.startswith('}') :
             nets_labelled.append([net_name, net_start.copy(), net_end.copy()])
+            signals.append([net_name, net_type, net_range])
             processing_net = False
                                                                           # text
     elif processing_text :
@@ -326,6 +338,8 @@ while not done :
             net_start[1] = int(net_info[2])
             net_end[0] = int(net_info[3])
             net_end[1] = int(net_info[4])
+            net_type = ''
+            net_range = ''
             processing_net_start = True
         elif line.startswith('T ') :
             text_block = ''
@@ -363,12 +377,13 @@ while not done_unlabelled :
                                                             # connect components
 if verbose :
     print("\nConnecting components")
-port_locations = []
+port_connections = []
 for component in components :
     component_name = component['name']
     component_location = component['location']
     if verbose :
         print(INDENT + component_name)
+                                                 # read port locations from file
     port_locations_file_spec = os.sep.join([
         scratch_directory,component_name + "-port_locations.txt"
     ])
@@ -382,81 +397,123 @@ for component in components :
         location_trimmed = location.replace('[', '').replace(']', '')
         location_trimmed = location_trimmed.replace(',', '')
         location_list = location_trimmed.split(' ')
-        if len(location_list) == 3 :
+        if len(location_list) >= 4 :
             port_name = location_list[0]
+            port_type = ' '.join(location_list[1:-2])
             port_coordinates = [
-                component_location[0] + int(location_list[1]),
-                component_location[1] + int(location_list[2])
+                component_location[0] + int(location_list[-2]),
+                component_location[1] + int(location_list[-1])
             ]
             for net in nets_labelled :
                 net_name = net[0]
                 net_start = net[1]
                 net_end = net[2]
+                                          # test if net and port locations match
                 if \
                     (net_start == port_coordinates) or \
                     (net_end == port_coordinates)      \
                 :
                     if verbose :
                         print(2*INDENT + "%s - %s" % (port_name, net_name))
-                    port_locations.append([component_name, port_name, net_name])
-#print(port_locations)
-
-#    print(2*INDENT, end='') ; print(component)
+                    port_connections.append(
+                        [component_name, port_name, net_name]
+                    )
+                                  # test if signal needs type and rage from port
+                    for signal in signals :
+                        if signal[0] == net_name :
+                            if not signal[1] :
+                                type_list = port_type.split('(')
+                                signal_type = type_list[0]
+                                signal[1] = signal_type
+                                if not signal[2] :
+                                    signal_range = ''
+                                    if len(type_list) > 1 :
+                                        signal_range = type_list[1].rstrip(')')
+                                    signal[2] = signal_range
 
 # ------------------------------------------------------------------------------
                                                             # write architecture
-# if verbose :
-#     print("\nWriting architecture")
-# vhdl_file = open(vhdl_file_spec, 'w')
-#                                                                   # entity start
-# vhdl_file.write("entity %s is\n" % symbol_name)
-#                                                                       # generics
-# if generics :
-#     separator = ';'
-#     if verbose :
-#         print(INDENT + "generics :")
-#     vhdl_file.write(INDENT + "generic (\n")
-#     for index in range(len(generics)) :
-#         generic = generics[index]
-#         if index == len(generics)-1 :
-#             separator = ''
-#         if verbose :
-#             generic_name = generic.split(':')[0]
-#             print(2*INDENT + generic_name)
-#         vhdl_file.write(2*INDENT + generic + separator + "\n")
-#     vhdl_file.write(INDENT + ");\n")
-#                                                                          # ports
-# if ports :
-#     separator = ';'
-#     if verbose :
-#         print(INDENT + "ports :")
-#     vhdl_file.write(INDENT + "port (\n")
-#     for index in range(len(ports)) :
-#         port_dictionary = ports[index]
-#         if index == len(ports)-1 :
-#             separator = ''
-#         if verbose :
-#             print(2*INDENT + port_dictionary['name'])
-#         vhdl_file.write(2*INDENT + "%s : %s %s%s%s\n" % (
-#             port_dictionary['name'],
-#             port_dictionary['direction'],
-#             port_dictionary['type'],
-#             port_dictionary['range'],
-#             separator
-#         ))
-#     vhdl_file.write(INDENT + ");\n")
-#                                                                     # entity end
-# vhdl_file.write("end %s;\n" % symbol_name)
-# vhdl_file.close()
-#                                                                   # write entity
-# if ports :
-#     if verbose :
-#         print("\nWriting port locations to %s" % port_locations_file_spec)
-#     port_locations_file = open(port_locations_file_spec, 'w')
-#     for port in ports :
-#         port_locations_file.write("%s [%s, %s]\n" % (
-#             port['name'],
-#             port['location'][0],
-#             port['location'][1]
-#         ))
-#     port_locations_file.close()
+if verbose :
+    print("\nWriting architecture")
+vhdl_file = open(vhdl_file_spec, 'w')
+                                                            # architecture start
+vhdl_file.write(
+    "architecture %s of %s is\n" % (architecture_name, symbol_name)
+)
+                                                                       # signals
+if signals :
+    separator = ';'
+    if verbose :
+        print(INDENT + "signals :")
+    vhdl_file.write("\n")
+    for index in range(len(signals)) :
+        signal = signals[index]
+        signal_name = signal[0]
+        signal_type = signal[1]
+        if signal[2] :
+            signal_type = "%s(%s)" % (signal_type, signal[2])
+        if verbose :
+            print(2*INDENT + "%s : %s" % (signal_name, signal_type))
+        if index == len(signals)-1 :
+            separator = ''
+        vhdl_file.write(
+            INDENT + "signal %s : %s%s\n" %
+            (signal_name, signal_type, separator)
+        )
+                                                                    # components
+if components :
+    if verbose :
+        print(INDENT + "components :")
+    vhdl_file.write("\n")
+    for component in components :
+        if verbose :
+            print(2*INDENT + component_name)
+                                                                         # label
+        # component_label = component['label']
+        # vhdl_file.write(INDENT)
+        # if component_label :
+        #     vhdl_file.write(component_label + ' : ')
+                                                                     # component
+        component_name = component['name']
+        vhdl_file.write(INDENT + "component %s\n" % component_name)
+        component_generics = component['generics']
+                                                                      # generics
+        if component_generics :
+            separator = ';'
+            vhdl_file.write(2*INDENT + "generics(\n")
+            for index in range(len(component_generics)) :
+                if index == len(component_generics)-1 :
+                    separator = ''
+                vhdl_file.write(
+                    3*INDENT + "%s%s\n" % (component_generics[index], separator)
+                )
+            vhdl_file.write(2*INDENT + ")\n")
+                                                                         # ports
+        ports_file_spec = os.sep.join([
+            scratch_directory,component_name + "-port_locations.txt"
+        ])
+        ports_file = open(ports_file_spec, 'r')
+        ports = ports_file.read().replace("\r", "\n").split("\n")
+        ports_file.close()
+        while (len(ports) > 0) and (not ports[-1]) :
+            ports.pop()
+        if ports :
+            print(ports)
+            separator = ';'
+            vhdl_file.write(2*INDENT + "port(\n")
+            for index in range(len(ports)) :
+                port_code = ports[index].split('[', 1)[0].rstrip(' ')
+                port_code = port_code.replace(' ', ' : ', 1)
+                if index == len(ports)-1 :
+                    separator = ''
+                vhdl_file.write(3*INDENT + "%s%s\n" % (port_code, separator))
+            vhdl_file.write(2*INDENT + ");\n")
+
+                                                                           # end
+        vhdl_file.write(INDENT + "end %s;\n\n" % component_name)
+                                                            # architecture begin
+vhdl_file.write("begin\n")
+                                                             # component mapping
+                                                              # architecture end
+vhdl_file.write("end %s;\n" % architecture_name)
+vhdl_file.close()
