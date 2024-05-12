@@ -8,5 +8,5 @@
 ;(component-library ".")
 
 ;(define I2S-schematics (build-path project-directory "I2S" "Schematics"))
-(source-library  (build-path project-directory "I2S" "Schematics"))
-(source-library  (build-path project-directory "I2S_test" "Schematics"))
+(source-library (build-path project-directory "I2S" "Schematics"))
+(source-library (build-path project-directory "I2S_test" "Schematics"))

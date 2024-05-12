@@ -33,7 +33,7 @@ parser.add_argument(
                                                              # scratch directory
 parser.add_argument(
     '-s', '--scratch', default='/tmp',
-    help = 'VHDL files directory'
+    help = 'scratch directory'
 )
                                                                 # verbose output
 parser.add_argument(
@@ -93,7 +93,10 @@ ports = []
 port_location = [0, 0]
 symbol_file = open(symbol_file_spec, 'r')
 while not done :
+                                                                # read next line
     line = symbol_file.readline().rstrip("\r\n")
+    # print(10*' ' + line)
+                                                                  # process port
     if processing_port :
         value = (line + '= ').split('=')[1]
                                                                      # port name
@@ -125,13 +128,15 @@ while not done :
                 'location' : port_location.copy()
             })
             processing_port = False
+                                                                  # process text
     elif processing_text :
                                                                       # generics
         if line.startswith('generic') :
             (label, generic) = line.split('=', 1)
-            generics.append(generic)
             if verbose :
-                print(INDENT + 'generic : ' + generic)
+                print(INDENT + 'generic :')
+                print(2*INDENT + generic)
+            generics.append(generic)
         processing_text = False
     else :
                                                             # schematics element
@@ -149,6 +154,7 @@ while not done :
             port_range = ''
             port_direction = 'in'
             processing_port = True
+                                                                          # text
         if line.startswith('T ') :
             processing_text = True
     if not line :
@@ -165,13 +171,14 @@ vhdl_file.write("library %s;\n" % VHDL_library)
 use_1164 = False
 use_numeric_std = False
 for port in ports :
-    if port['type'].lower().startswith('std_logic') :
+    port_type = port['type'].lower()
+    if port_type.startswith('std_logic') :
         use_1164 = True
-    if port['type'].lower().startswith('std_ulogic') :
+    if port_type.startswith('std_ulogic') :
         use_1164 = True
-    if port['type'].lower() == 'unsigned' :
+    if port_type == 'unsigned' :
         use_numeric_std = True
-    if port['type'].lower() == 'signed' :
+    if port_type == 'signed' :
         use_numeric_std = True
 if use_1164 or use_numeric_std :
     vhdl_file.write("library ieee;\n")
@@ -181,7 +188,8 @@ if use_numeric_std :
     vhdl_file.write(INDENT + "use ieee.numeric_std.all;\n")
 vhdl_file.write("\n")
                                                                   # entity start
-vhdl_file.write("entity %s is\n" % symbol_name)
+vhdl_symbol_name = symbol_name.replace('-', '_')
+vhdl_file.write("entity %s is\n" % vhdl_symbol_name)
                                                                       # generics
 if generics :
     separator = ';'
@@ -218,7 +226,7 @@ if ports :
         ))
     vhdl_file.write(INDENT + ");\n")
                                                                     # entity end
-vhdl_file.write("end %s;\n" % symbol_name)
+vhdl_file.write("end %s;\n" % vhdl_symbol_name)
 vhdl_file.close()
                                                                   # write entity
 if ports :

@@ -20,6 +20,11 @@ parser = argparse.ArgumentParser(
 )
                                                                     # input file
 parser.add_argument('input_file')
+                                                                  # VHDL library
+parser.add_argument(
+    '-l', '--library',
+    help = 'VHDL library'
+)
                                                                 # VHDL directory
 parser.add_argument(
     '-d', '--directory',
@@ -28,7 +33,7 @@ parser.add_argument(
                                                              # scratch directory
 parser.add_argument(
     '-s', '--scratch', default='/tmp',
-    help = 'VHDL files directory'
+    help = 'scratch directory'
 )
                                                                 # verbose output
 parser.add_argument(
@@ -39,6 +44,7 @@ parser.add_argument(
 parser_arguments = parser.parse_args()
 
 schematics_file_spec = parser_arguments.input_file
+VHDL_library = parser_arguments.library
 VHDL_directory = parser_arguments.directory
 scratch_directory = parser_arguments.scratch
 verbose = parser_arguments.verbose
@@ -50,17 +56,19 @@ else :
     path_list = schematics_file_path.split(os.sep)
     path_list[-1] = 'Description'
     vhdl_file_path = os.sep.join(path_list)
-symbol_name_parts = \
+schematics_name_parts = \
     os.path.basename(schematics_file_spec).rstrip('.sch').split('-')
-library_name = symbol_name_parts.pop(0)
-architecture_name = symbol_name_parts.pop()
-symbol_name = '-'.join(symbol_name_parts)
+library_name = schematics_name_parts.pop(0)
+architecture_name = schematics_name_parts.pop()
+symbol_name = '-'.join(schematics_name_parts)
 vhdl_file_spec = os.path.join(vhdl_file_path, "%s-%s-%s.vhd" %
     (library_name, symbol_name, architecture_name)
 )
+if not VHDL_library :
+    VHDL_library = library_name
                                                                # validity checks
 if not os.path.isfile(schematics_file_spec) :
-    print("symbol file %s not found" % schematics_file_spec)
+    print("schematics file %s not found" % schematics_file_spec)
     quit()
 
 if not os.path.isdir(vhdl_file_path) :
@@ -70,7 +78,6 @@ if not os.path.isdir(vhdl_file_path) :
 if not os.path.isdir(scratch_directory) :
     print("scratch directory %s not found" % scratch_directory)
     quit()
-
 
 # ==============================================================================
 # functions
@@ -226,7 +233,6 @@ signals = []
 component_location = [0, 0]
 net_start = [0, 0]
 net_end = [0, 0]
-text_block = ''
 text_blocks = []
 
 schematics_file = open(schematics_file_spec, 'r')
@@ -346,8 +352,8 @@ while not done :
             processing_text = True
     if not line :
         done = True
-schematics_file.close()
 
+print(components)
 # ------------------------------------------------------------------------------
                                                                 # aggregate nets
 if verbose :
@@ -436,38 +442,60 @@ for component in components :
 if verbose :
     print("\nWriting architecture")
 vhdl_file = open(vhdl_file_spec, 'w')
+                                                                     # libraries
+vhdl_file.write("library %s;\n" % VHDL_library)
+use_1164 = False
+use_numeric_std = False
+for signal in signals :
+    signal_type = signal[1].lower()
+    if signal_type.startswith('std_logic') :
+        use_1164 = True
+    if signal_type.startswith('std_ulogic') :
+        use_1164 = True
+    if signal_type == 'unsigned' :
+        use_numeric_std = True
+    if signal_type == 'signed' :
+        use_numeric_std = True
+if use_1164 or use_numeric_std :
+    vhdl_file.write("library ieee;\n")
+if use_1164 :
+    vhdl_file.write(INDENT + "use ieee.std_logic_1164.all;\n")
+if use_numeric_std :
+    vhdl_file.write(INDENT + "use ieee.numeric_std.all;\n")
+vhdl_file.write("\n")
                                                             # architecture start
 vhdl_file.write(
-    "architecture %s of %s-%s is\n" %
+    "architecture %s of %s_%s is\n" %
     (architecture_name, library_name, symbol_name)
 )
                                                         # pre-begin declarations
-
-
-
-
-
-
-
+remaining_text_blocks = []
+for embedded_text in text_blocks :
+    if embedded_text.startswith('architecture start') :
+        vhdl_file.write("\n")
+        start_code = embedded_text.split("\n")
+        for line in start_code[1:] :
+            vhdl_file.write(INDENT + line + "\n")
+    else :
+        remaining_text_blocks.append(embedded_text)
+if verbose :
+    if len(remaining_text_blocks) < len(text_blocks) :
+        print(INDENT + 'start code')
+text_blocks = remaining_text_blocks
                                                                        # signals
 if signals :
-    separator = ';'
     if verbose :
         print(INDENT + "signals :")
     vhdl_file.write("\n")
-    for index in range(len(signals)) :
-        signal = signals[index]
+    for signal in signals :
         signal_name = signal[0]
         signal_type = signal[1]
         if signal[2] :
             signal_type = "%s(%s)" % (signal_type, signal[2])
         if verbose :
             print(2*INDENT + "%s : %s" % (signal_name, signal_type))
-        if index == len(signals)-1 :
-            separator = ''
         vhdl_file.write(
-            INDENT + "signal %s : %s%s\n" %
-            (signal_name, signal_type, separator)
+            INDENT + "signal %s : %s;\n" % (signal_name, signal_type)
         )
                                                                     # components
 if components :
@@ -475,11 +503,13 @@ if components :
         print(INDENT + "component declarations :")
     vhdl_file.write("\n")
     for component in components :
+        component_name = component['name']
+        vhdl_component_name = component_name.replace('-', '_')
         if verbose :
             print(2*INDENT + component_name)
                                                                      # component
         component_name = component['name']
-        vhdl_file.write(INDENT + "component %s\n" % component_name)
+        vhdl_file.write(INDENT + "component %s\n" % vhdl_component_name)
                                                                       # generics
         component_generics = component['generics']
         if component_generics :
@@ -491,7 +521,7 @@ if components :
                 vhdl_file.write(
                     3*INDENT + "%s%s\n" % (component_generics[index], separator)
                 )
-            vhdl_file.write(2*INDENT + ")\n")
+            vhdl_file.write(2*INDENT + ");\n")
                                                                          # ports
         ports_file_spec = os.sep.join([
             scratch_directory,component_name + "-port_locations.txt"
@@ -513,7 +543,7 @@ if components :
             vhdl_file.write(2*INDENT + ");\n")
 
                                                                            # end
-        vhdl_file.write(INDENT + "end %s;\n\n" % component_name)
+        vhdl_file.write(INDENT + "end component %s;\n\n" % vhdl_component_name)
                                                             # architecture begin
 vhdl_file.write("begin\n")
                                                              # component mapping
@@ -523,6 +553,7 @@ if components :
     vhdl_file.write("\n")
     for component in components :
         component_name = component['name']
+        vhdl_component_name = component_name.replace('-', '_')
         if verbose :
             print(2*INDENT + component_name)
                                                                          # label
@@ -531,7 +562,7 @@ if components :
         if component_label :
             vhdl_file.write(component_label + ' : ')
                                                                      # component
-        vhdl_file.write("%s\n" % component['name'])
+        vhdl_file.write("%s\n" % vhdl_component_name)
                                                                # generic mapping
         component_generics = component['generics']
         if component_generics :
@@ -571,6 +602,19 @@ if components :
                 )
             vhdl_file.write(2*INDENT + ");\n")
         vhdl_file.write("\n")
+                                                                 # embedded code
+found_embedded_code = False
+if text_blocks :
+    for embedded_text in text_blocks :
+        if embedded_text.startswith('embedded code') :
+            start_code = embedded_text.split("\n")
+            for line in start_code[1:] :
+                vhdl_file.write(INDENT + line + "\n")
+            vhdl_file.write("\n")
+            found_embedded_code = True
+if found_embedded_code :
+    if verbose :
+        print(INDENT + 'embedded code')
                                                               # architecture end
 vhdl_file.write("end %s;\n" % architecture_name)
 vhdl_file.close()
