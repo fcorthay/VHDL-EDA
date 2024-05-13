@@ -52,7 +52,7 @@ parser.add_argument(
                                                              # process arguments
 parser_arguments = parser.parse_args()
 
-top_architecture_file_spec = parser_arguments.input_file
+top_architecture_file_spec = os.path.realpath(parser_arguments.input_file)
 gafrc_file_spec = parser_arguments.gafrc
 VHDL_directory = parser_arguments.directory
 scratch_directory = parser_arguments.scratch
@@ -60,6 +60,12 @@ verbose = parser_arguments.verbose
 
 VHDL_library = parser_arguments.library
 vhdl_file_path = VHDL_directory
+
+top_architecture = top_architecture_file_spec.split(os.sep)[-1]
+top_architecture = '.'.join(top_architecture.split('.')[:-1])
+compile_list_file_spec = os.path.join(
+    scratch_directory, top_architecture + '-compile_list.txt'
+)
 
 top_symbol_file_spec = top_architecture_file_spec.replace(
     'Schematics', 'Symbols'
@@ -150,7 +156,7 @@ def find_components(schematics_file_spec):
         print("schematics file %s not found" % schematics_file_spec)
         quit()
     if verbose :
-        print(INDENT + schematics_file_spec)
+        print(INDENT + schematics_file_spec.split(os.sep)[-1])
                                                                     # parse file
     components = []
     search_for_component_info = False
@@ -191,17 +197,41 @@ if not os.path.isfile(gafrc_file_spec) :
 if verbose :
     print("\nreading %s" % gafrc_file_spec)
 (symbol_paths, schematics_paths) = find_paths()
+vhdl_paths = []
+for schematics_path in schematics_paths :
+    vhdl_paths.append(schematics_path.replace('Schematics', 'Description'))
 
 # ------------------------------------------------------------------------------
                                                                    # parse files
 if verbose :
     print("\nbuilding component list")
+
+compile_files = [top_symbol_file_spec, top_architecture_file_spec]
+configurations = []
 to_parse = [top_architecture_file_spec]
-symbols_to_convert = [os.path.realpath(top_symbol_file_spec)]
-schematics_to_convert = [os.path.realpath(top_architecture_file_spec)]
+symbols_to_convert = [top_symbol_file_spec]
+schematics_to_convert = [top_architecture_file_spec]
 while to_parse :
                                                                # parse component
     components = find_components(to_parse[0])
+                                                    # prepare vhdl configuration
+    configuration_component = to_parse[0].split(os.sep)[-1].rstrip('.sch')
+    configuration_component_list = configuration_component.split('-')
+    configuration_architecture = configuration_component_list[-1]
+    configuration_component = '_'.join(configuration_component_list[:-1])
+    configuration_components = []
+    for component in components :
+        if component.endswith('.sch') or component.endswith('.vhd') :
+            component = component.rstrip('.sch')
+            component = component.rstrip('.vhd')
+            component_list = component.split('-')
+            component_architecture = component_list[-1]
+            component = '_'.join(component_list[:-1])
+            configurations.append([
+                configuration_component, configuration_architecture,
+                component, component_architecture
+            ])
+
     for component in components :
                                                            # update symbols list
         if component.endswith('.sym') :
@@ -212,11 +242,12 @@ while to_parse :
                     symbol_file_spec = test_spec
             if symbol_file_spec :
                 symbols_to_convert.append(symbol_file_spec)
+                compile_files.append(symbol_file_spec)
             else :
                 print("symbol file %s not found" % component)
                 quit()
                                                         # update schematics list
-        if component.endswith('.sch') :
+        elif component.endswith('.sch') :
             schematic_file_spec = ''
             for schematics_path in schematics_paths :
                 test_spec = os.sep.join([schematics_path, component])
@@ -224,9 +255,21 @@ while to_parse :
                     schematic_file_spec = test_spec
             if schematic_file_spec :
                 schematics_to_convert.append(schematic_file_spec)
+                compile_files.append(symbol_file_spec)
                 to_parse.append(schematic_file_spec)
             else :
                 print("schematics file %s not found" % component)
+                quit()
+        else :
+            architecture_file_spec = ''
+            for vhdl_path in vhdl_paths :
+                test_spec = os.sep.join([vhdl_path, component])
+                if os.path.isfile(test_spec) :
+                    vhdl_file_spec = test_spec
+            if vhdl_file_spec :
+                compile_files.append(vhdl_file_spec)
+            else :
+                print("vhdl file %s not found" % component)
                 quit()
 
     to_parse.pop(0)
@@ -258,3 +301,18 @@ for schematics in schematics_to_convert :
     if verbose :
         print(INDENT + schematics)
     os.system("%s %s > /dev/null" % (command, schematics))
+
+# ------------------------------------------------------------------------------
+                                                            # write compile list
+if verbose :
+    print("\nwriting compilation list")
+compile_list_file = open(compile_list_file_spec, 'w')
+for compile_file in compile_files :
+    compile_file = compile_file.replace('Symbols', 'Description')
+    compile_file = compile_file.replace('Schematics', 'Description')
+    compile_file = compile_file.replace('.sym', '.vhd')
+    compile_file = compile_file.replace('.sch', '.vhd')
+    if verbose :
+        print(INDENT + compile_file)
+    compile_list_file.write("%s\n" % compile_file)
+compile_list_file.close()

@@ -14,8 +14,9 @@ begin
   process
   begin
     wait for 10 us;
-    assert false report "end of test" severity failure;
-
+    assert false
+      report "end of test"
+      severity failure;
     wait;
   end process;
 
